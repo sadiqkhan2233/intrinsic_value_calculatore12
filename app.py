@@ -231,25 +231,34 @@ def run_dcf(fcf0, growth, wacc, tg, debt, cash, shares, years=PROJECTION_YEARS):
 # ----------------------------------------------------------------------------
 # Groq AI summary
 # ----------------------------------------------------------------------------
+GROQ_MODEL = "openai/gpt-oss-120b"
+
+
 def groq_summary(api_key: str, prompt: str) -> str:
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    payload = {
-        "model": GROQ_MODEL,
-        "temperature": 0.3,
-        "max_tokens": 400,
-        "messages": [
-            {"role": "system",
-             "content": "You are a concise, careful equity analyst covering the Pakistan Stock Exchange. "
-                        "Respond with exactly 3 bullet points. No preamble, no investment advice, "
-                        "no made-up facts."},
-            {"role": "user", "content": prompt},
-        ],
-    }
-    resp = requests.post(GROQ_URL, headers=headers, json=payload, timeout=30)
-    if resp.status_code == 401:
-        raise DataError("Groq rejected the API key (401 Unauthorized).")
-    resp.raise_for_status()
-    return resp.json()["choices"][0]["message"]["content"].strip()
+    """Generate the AI summary using the official Groq client."""
+    try:
+        from groq import Groq
+    except ImportError:
+        raise DataError("The 'groq' package is missing. Add `groq` to requirements.txt and redeploy.")
+
+    api_key = api_key.strip()  # remove accidental spaces/newlines from pasted keys
+    try:
+        client = Groq(api_key=api_key, timeout=30)
+        completion = client.chat.completions.create(
+            model=GROQ_MODEL,
+            temperature=0.3,
+            max_tokens=400,
+            messages=[
+                {"role": "system",
+                 "content": "You are a concise, careful equity analyst covering the Pakistan Stock Exchange. "
+                            "Respond with exactly 3 bullet points. No preamble, no investment advice, "
+                            "no made-up facts."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        return completion.choices[0].message.content.strip()
+    except Exception as e:
+        raise DataError(f"Groq request failed: {e}")
 
 
 # ----------------------------------------------------------------------------
